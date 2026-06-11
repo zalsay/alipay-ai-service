@@ -1,7 +1,7 @@
 version: '3.9'
 services:
   alipay-ai-service:
-    build: .
+    image: alipay-ai-service-runtime:latest
     container_name: alipay-ai-service
     ports:
       - "8080:8080"
