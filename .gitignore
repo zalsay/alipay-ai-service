@@ -1,0 +1,10 @@
+.env
+*.pem
+*.key
+/dist
+/tmp
+/alipay-ai-service
+coverage.out
+.DS_Store
+.idea
+.vscode
