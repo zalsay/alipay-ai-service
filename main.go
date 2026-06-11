@@ -16,7 +16,16 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handlers.HandleHealthz)
+
+	// Backward-compatible generic OpenAPI proxy.
 	mux.HandleFunc("POST /v1/ai-collect/call", handlers.HandlePay)
+
+	// AI Collect gateway routes for Agent scenarios.
+	mux.HandleFunc("POST /v1/ai-collect/credential/query", handlers.HandleCredentialQuery)
+	mux.HandleFunc("POST /v1/ai-collect/fulfillment/confirm", handlers.HandleFulfillmentConfirm)
+	mux.HandleFunc("POST /v1/paid-resource/prepare", handlers.HandlePaidResource)
+
+	// Alipay async notification callback.
 	mux.HandleFunc("POST /v1/alipay/notify", handlers.HandleNotify)
 
 	log.Printf("alipay ai service listening on %s", cfg.ServerAddr)
