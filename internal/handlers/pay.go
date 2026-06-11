@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/zalsay/alipay-ai-service/internal/config"
 	"github.com/zalsay/alipay-ai-service/internal/utils"
@@ -19,37 +20,49 @@ type AICollectRequest struct {
 func HandlePay(w http.ResponseWriter, r *http.Request) {
 	var req AICollectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), 400)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.BizContent == nil {
+		http.Error(w, "biz_content is required", http.StatusBadRequest)
 		return
 	}
 
 	cfg, err := config.Load()
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	method := req.Method
+	method := strings.TrimSpace(req.Method)
 	if method == "" {
 		method = cfg.AICollectMethod
 	}
 
-	bizContentBytes, _ := json.Marshal(req.BizContent)
+	bizContentBytes, err := json.Marshal(req.BizContent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	params := map[string]string{
-		"app_id":     cfg.AppID,
-		"method":     method,
-		"format":     "JSON",
-		"charset":    "utf-8",
-		"sign_type":  "RSA2",
-		"timestamp":  "2026-06-11 12:00:00",
-		"version":    cfg.AICollectVersion,
-		"notify_url": cfg.NotifyURL,
+		"app_id":      cfg.AppID,
+		"method":      method,
+		"format":      "JSON",
+		"charset":     "utf-8",
+		"sign_type":   "RSA2",
+		"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
+		"version":     cfg.AICollectVersion,
+		"notify_url":  cfg.NotifyURL,
 		"biz_content": string(bizContentBytes),
+	}
+	if cfg.AppAuthToken != "" {
+		params["app_auth_token"] = cfg.AppAuthToken
 	}
 
 	sign, err := utils.SignRSA2(params, cfg.AppPrivateKey)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	params["sign"] = sign
@@ -61,12 +74,13 @@ func HandlePay(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := http.Post(cfg.Gateway, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(body)
 }
