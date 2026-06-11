@@ -8,26 +8,31 @@ import (
 )
 
 type Config struct {
-	ServerAddr      string
-	Gateway         string
-	AppID           string
-	AppPrivateKey   string
-	AlipayPublicKey string
-	NotifyURL       string
-	AICollectMethod string
-	AICollectVersion string
-	AppAuthToken    string
+	ServerAddr                 string
+	Gateway                    string
+	AppID                      string
+	AppPrivateKey              string
+	AlipayPublicKey            string
+	NotifyURL                  string
+	AICollectMethod            string
+	AICollectCredentialMethod  string
+	AICollectFulfillmentMethod string
+	AICollectVersion           string
+	AppAuthToken               string
 }
 
 func Load() (Config, error) {
+	legacyMethod := os.Getenv("ALIPAY_AI_COLLECT_METHOD")
 	cfg := Config{
-		ServerAddr:       getenv("SERVER_ADDR", ":8080"),
-		Gateway:          getenv("ALIPAY_GATEWAY", "https://openapi.alipay.com/gateway.do"),
-		AppID:            os.Getenv("ALIPAY_APP_ID"),
-		NotifyURL:        os.Getenv("ALIPAY_NOTIFY_URL"),
-		AICollectMethod:  os.Getenv("ALIPAY_AI_COLLECT_METHOD"),
-		AICollectVersion: getenv("ALIPAY_AI_COLLECT_VERSION", "1.0"),
-		AppAuthToken:     os.Getenv("ALIPAY_APP_AUTH_TOKEN"),
+		ServerAddr:                 getenv("SERVER_ADDR", ":8080"),
+		Gateway:                    getenv("ALIPAY_GATEWAY", "https://openapi.alipay.com/gateway.do"),
+		AppID:                      os.Getenv("ALIPAY_APP_ID"),
+		NotifyURL:                  os.Getenv("ALIPAY_NOTIFY_URL"),
+		AICollectMethod:            legacyMethod,
+		AICollectCredentialMethod:  getenv("ALIPAY_AI_COLLECT_CREDENTIAL_METHOD", legacyMethod),
+		AICollectFulfillmentMethod: getenv("ALIPAY_AI_COLLECT_FULFILLMENT_METHOD", legacyMethod),
+		AICollectVersion:           getenv("ALIPAY_AI_COLLECT_VERSION", "1.0"),
+		AppAuthToken:               os.Getenv("ALIPAY_APP_AUTH_TOKEN"),
 	}
 
 	var err error
@@ -49,8 +54,11 @@ func Load() (Config, error) {
 	if cfg.AlipayPublicKey == "" {
 		return cfg, errors.New("ALIPAY_PUBLIC_KEY or ALIPAY_PUBLIC_KEY_FILE is required")
 	}
-	if cfg.AICollectMethod == "" {
-		return cfg, errors.New("ALIPAY_AI_COLLECT_METHOD is required unless each call supplies method")
+	if cfg.AICollectCredentialMethod == "" {
+		return cfg, errors.New("ALIPAY_AI_COLLECT_CREDENTIAL_METHOD is required for AI Collect credential query")
+	}
+	if cfg.AICollectFulfillmentMethod == "" {
+		return cfg, errors.New("ALIPAY_AI_COLLECT_FULFILLMENT_METHOD is required for AI Collect fulfillment confirmation")
 	}
 	return cfg, nil
 }
