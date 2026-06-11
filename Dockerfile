@@ -3,7 +3,7 @@ FROM golang:1.22-alpine AS builder
 WORKDIR /app
 COPY . .
 
-RUN apk add --no-cache git bash && \
+RUN apk add --no-cache git bash make && \
     make build
 
 FROM alpine:3.18
