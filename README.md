@@ -1,16 +1,105 @@
 # Alipay AI Collect Service (Agent / AI 收网关)
 
-Golang backend service for Alipay AI Collect API, designed for Agent scenarios.
+Golang backend service for Alipay AI 收 / A2A Agent paid-resource scenarios.
+
+This project implements the documented flow:
+
+1. Agent requests a paid resource.
+2. Seller server checks the `Payment-Proof` request header.
+3. If no valid proof exists, seller server returns `402 Payment Required` with a `Payment-Needed` header.
+4. Agent/user completes payment with Alipay.
+5. Agent retries the resource request with `Payment-Proof`.
+6. Seller server calls `alipay.aipay.agent.payment.verify`.
+7. If `active=true`, seller server returns the resource and asynchronously calls `alipay.aipay.agent.fulfillment.confirm`.
 
 ## Features
 
-- AI 收网关模式：支持 Agent 调用付费资源
-- 支持凭证查询、履约确认、异步通知
-- 原有通用 OpenAPI 代理 `/v1/ai-collect/call` 保留兼容
-- 支持静态二进制构建和 Docker 容器化部署
-- 支持生产级 RSA2 签名与异步通知验签
+- Implements `402 Payment Required` + `Payment-Needed` header.
+- Parses `Payment-Proof` header.
+- Calls `alipay.aipay.agent.payment.verify` to verify paid credentials.
+- Calls `alipay.aipay.agent.fulfillment.confirm` after resource delivery.
+- Builds local `seller_signature` for the Payment-Needed bill using RSA2.
+- Keeps `/v1/ai-collect/call` as a backward-compatible raw OpenAPI proxy.
+- Keeps `/v1/alipay/notify` for compatibility with asynchronous Alipay notifications.
 
-## API Endpoints
+## Main Endpoint
+
+### Paid Resource Access
+
+```bash
+curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_id": "RES_001",
+    "out_trade_no": "ORDER_001",
+    "goods_name": "Agent API Call",
+    "amount": "0.01",
+    "currency": "CNY"
+  }'
+```
+
+Without `Payment-Proof`, the expected response is:
+
+```http
+HTTP/1.1 402 Payment Required
+Payment-Needed: <base64url encoded bill>
+Content-Type: application/json; charset=utf-8
+```
+
+Response body:
+
+```json
+{
+  "error": "Payment Needed",
+  "message": "payment is required to access this resource",
+  "resource_id": "RES_001"
+}
+```
+
+The `Payment-Needed` header decodes to:
+
+```json
+{
+  "protocol": {
+    "out_trade_no": "ORDER_001",
+    "amount": "0.01",
+    "currency": "CNY",
+    "network": "alipay-a2a-prod",
+    "resource_id": "RES_001",
+    "pay_before": "2026-03-25T12:00:00+08:00",
+    "seller_signature": "...",
+    "seller_sign_type": "RSA2",
+    "seller_unique_id": "2088..."
+  },
+  "method": {
+    "seller_name": "测试商家",
+    "seller_id": "2088...",
+    "seller_app_id": "2019...",
+    "goods_name": "Agent API Call",
+    "seller_unique_id_key": "seller_id",
+    "service_id": "..."
+  }
+}
+```
+
+After the Agent/user pays, retry with `Payment-Proof`:
+
+```bash
+curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
+  -H 'Content-Type: application/json' \
+  -H 'Payment-Proof: <base64 encoded proof from buyer agent>' \
+  -d '{
+    "resource_id": "RES_001",
+    "out_trade_no": "ORDER_001",
+    "goods_name": "Agent API Call",
+    "amount": "0.01",
+    "currency": "CNY"
+  }'
+```
+
+If `alipay.aipay.agent.payment.verify` returns `active=true`, the service returns `200 OK` and sends fulfillment confirmation in the background.
+
+## Other Endpoints
 
 ### Health check
 
@@ -18,55 +107,17 @@ Golang backend service for Alipay AI Collect API, designed for Agent scenarios.
 curl http://localhost:8080/healthz
 ```
 
-### AI Collect - Credential Query
+### Manual Fulfillment Confirm
 
 ```bash
-POST /v1/ai-collect/credential/query
-Content-Type: application/json
-
-{
-  "biz_content": {
-    "out_biz_no": "agent-call-001",
-    "resource_id": "resource-001"
-  }
-}
+curl -i -X POST http://localhost:8080/v1/ai-collect/fulfillment/confirm \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "biz_content": {
+      "trade_no": "20260324008281172041220000012182"
+    }
+  }'
 ```
-
-### AI Collect - Fulfillment Confirm
-
-```bash
-POST /v1/ai-collect/fulfillment/confirm
-Content-Type: application/json
-
-{
-  "biz_content": {
-    "out_biz_no": "agent-call-001",
-    "trade_no": "2023061122001401234567890"
-  }
-}
-```
-
-### Paid Resource Entry for Agent
-
-```bash
-POST /v1/paid-resource/prepare
-Content-Type: application/json
-
-{
-  "resource_id": "resource-001",
-  "out_biz_no": "agent-call-001",
-  "subject": "Agent API Call",
-  "amount": "0.01"
-}
-```
-
-### Alipay Async Notification
-
-Configure in Alipay Open Platform:
-```
-https://your-domain.example.com/v1/alipay/notify
-```
-The service validates the signature and returns `success` on success, otherwise `fail`.
 
 ### Backward-compatible OpenAPI Proxy
 
@@ -74,28 +125,41 @@ The service validates the signature and returns `success` on success, otherwise 
 POST /v1/ai-collect/call
 ```
 
-This endpoint can still be used to call arbitrary AI Collect OpenAPI methods.
+### Alipay Async Notification
+
+```text
+POST /v1/alipay/notify
+```
 
 ## Environment Variables
 
 | Variable | Description |
 | --- | --- |
-| SERVER_ADDR | HTTP listen address, default `:8080` |
-| ALIPAY_GATEWAY | Alipay OpenAPI Gateway, default `https://openapi.alipay.com/gateway.do` |
-| ALIPAY_APP_ID | Open Platform AppID |
-| ALIPAY_APP_PRIVATE_KEY / ALIPAY_APP_PRIVATE_KEY_FILE | Application private key PEM |
-| ALIPAY_PUBLIC_KEY / ALIPAY_PUBLIC_KEY_FILE | Alipay public key PEM |
-| ALIPAY_NOTIFY_URL | Asynchronous notification callback URL |
-| ALIPAY_AI_COLLECT_CREDENTIAL_METHOD | AI Collect credential query method |
-| ALIPAY_AI_COLLECT_FULFILLMENT_METHOD | AI Collect fulfillment confirmation method |
-| ALIPAY_AI_COLLECT_VERSION | API version, default `1.0` |
-| ALIPAY_APP_AUTH_TOKEN | Optional, service provider token for acting on behalf of merchant |
+| `SERVER_ADDR` | HTTP listen address, default `:8080` |
+| `ALIPAY_GATEWAY` | Alipay OpenAPI Gateway, default `https://openapi.alipay.com/gateway.do` |
+| `ALIPAY_APP_ID` | Open Platform AppID |
+| `ALIPAY_APP_PRIVATE_KEY` / `ALIPAY_APP_PRIVATE_KEY_FILE` | Application private key PEM |
+| `ALIPAY_PUBLIC_KEY` / `ALIPAY_PUBLIC_KEY_FILE` | Alipay public key PEM |
+| `ALIPAY_PAYMENT_VERIFY_METHOD` | Default `alipay.aipay.agent.payment.verify` |
+| `ALIPAY_AI_COLLECT_FULFILLMENT_METHOD` | Default `alipay.aipay.agent.fulfillment.confirm` |
+| `ALIPAY_SELLER_ID` | Seller userId / 2088 ID |
+| `ALIPAY_SELLER_NAME` | Seller display name |
+| `ALIPAY_SELLER_APP_ID` | Seller app id; defaults to `ALIPAY_APP_ID` |
+| `ALIPAY_SELLER_UNIQUE_ID_KEY` | Default `seller_id` |
+| `ALIPAY_SERVICE_ID` | Service ID from Alipay AI 收 documentation |
+| `ALIPAY_DEFAULT_GOODS_NAME` | Default goods title |
+| `ALIPAY_DEFAULT_AMOUNT` | Default amount, e.g. `0.01` |
+| `ALIPAY_DEFAULT_CURRENCY` | Default `CNY` |
+| `ALIPAY_PAYMENT_NETWORK` | Default `alipay-a2a-prod` |
+| `ALIPAY_PAYMENT_PROOF_TTL_MINUTES` | Payment bill expiration minutes, default `15` |
+| `ALIPAY_AI_COLLECT_VERSION` | API version, default `1.0` |
+| `ALIPAY_APP_AUTH_TOKEN` | Optional service provider token |
 
 ## Build & Run
 
 ```bash
-make build        # Build static binary
-./dist/alipay-ai-service  # Run locally
+make build
+./dist/alipay-ai-service
 ```
 
 ### Docker
@@ -108,15 +172,13 @@ docker compose up --build -d
 
 ```bash
 chmod +x setup.sh
-./setup.sh  # Build and restart docker-compose
+./setup.sh
 ```
 
 ## Notes
 
-1. Always use the public key provided by Alipay for production.
-2. `biz_content` fields must follow the fields defined in your Alipay Open Platform AI Collect documentation.
-3. For Agent calls, always set `out_biz_no` uniquely to ensure idempotency.
-4. New AI Collect gateway endpoints:
-   - `/v1/ai-collect/credential/query`
-   - `/v1/ai-collect/fulfillment/confirm`
-   - `/v1/paid-resource/prepare`
+1. AI 收 currently does not support sandbox debugging according to the provided Alipay documentation.
+2. Do not commit private keys to the repository.
+3. `Payment-Needed` uses Base64URL encoding.
+4. `Payment-Proof` is provided by the buyer Agent after payment.
+5. This project currently returns placeholder paid content. Replace the `content` field in `HandlePaidResource` with your real resource delivery logic.
