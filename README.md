@@ -26,8 +26,24 @@ This project implements the documented flow:
 
 ### Paid Resource Access
 
+Local service path:
+
 ```bash
 curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_id": "RES_001",
+    "out_trade_no": "ORDER_001",
+    "goods_name": "Agent API Call",
+    "amount": "0.01",
+    "currency": "CNY"
+  }'
+```
+
+Public Nginx path with `/alipay` prefix:
+
+```bash
+curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare \
   -H 'Content-Type: application/json' \
   -d '{
     "resource_id": "RES_001",
@@ -85,7 +101,7 @@ The `Payment-Needed` header decodes to:
 After the Agent/user pays, retry with `Payment-Proof`:
 
 ```bash
-curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
+curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare \
   -H 'Content-Type: application/json' \
   -H 'Payment-Proof: <base64 encoded proof from buyer agent>' \
   -d '{
@@ -99,12 +115,39 @@ curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
 
 If `alipay.aipay.agent.payment.verify` returns `active=true`, the service returns `200 OK` and sends fulfillment confirmation in the background.
 
+## Nginx `/alipay` Prefix
+
+The Go service listens on `/v1/...`. To expose public URLs under `/alipay/v1/...`, run:
+
+```bash
+sudo bash scripts/install-nginx-alipay-prefix.sh your-domain.example.com 127.0.0.1:8080
+```
+
+This creates:
+
+```text
+/alipay/v1/... -> /v1/...
+/alipay/healthz -> /healthz
+```
+
+Test after installation:
+
+```bash
+curl -i http://your-domain.example.com/alipay/healthz
+curl -i -X POST http://your-domain.example.com/alipay/v1/paid-resource/prepare \
+  -H 'Content-Type: application/json' \
+  -d '{"resource_id":"RES_001","out_trade_no":"ORDER_001","goods_name":"Agent API Call","amount":"0.01","currency":"CNY"}'
+```
+
+For HTTPS, install a certificate with your preferred tool, such as certbot, and keep the same `/alipay/` location rules.
+
 ## Other Endpoints
 
 ### Health check
 
 ```bash
 curl http://localhost:8080/healthz
+curl http://your-domain.example.com/alipay/healthz
 ```
 
 ### Manual Fulfillment Confirm
@@ -119,16 +162,26 @@ curl -i -X POST http://localhost:8080/v1/ai-collect/fulfillment/confirm \
   }'
 ```
 
+With Nginx prefix:
+
+```bash
+curl -i -X POST https://your-domain.example.com/alipay/v1/ai-collect/fulfillment/confirm \
+  -H 'Content-Type: application/json' \
+  -d '{"biz_content":{"trade_no":"20260324008281172041220000012182"}}'
+```
+
 ### Backward-compatible OpenAPI Proxy
 
 ```bash
 POST /v1/ai-collect/call
+POST /alipay/v1/ai-collect/call
 ```
 
 ### Alipay Async Notification
 
 ```text
 POST /v1/alipay/notify
+POST /alipay/v1/alipay/notify
 ```
 
 ## Environment Variables
