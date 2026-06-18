@@ -19,6 +19,18 @@ type Config struct {
 	AICollectFulfillmentMethod string
 	AICollectVersion           string
 	AppAuthToken               string
+
+	SellerID                string
+	SellerName              string
+	SellerAppID             string
+	SellerUniqueIDKey       string
+	ServiceID               string
+	DefaultGoodsName        string
+	DefaultAmount           string
+	DefaultCurrency         string
+	PaymentNetwork          string
+	PaymentProofTTLMinutes  string
+	PaymentVerifyMethod     string
 }
 
 func Load() (Config, error) {
@@ -30,9 +42,20 @@ func Load() (Config, error) {
 		NotifyURL:                  os.Getenv("ALIPAY_NOTIFY_URL"),
 		AICollectMethod:            legacyMethod,
 		AICollectCredentialMethod:  getenv("ALIPAY_AI_COLLECT_CREDENTIAL_METHOD", legacyMethod),
-		AICollectFulfillmentMethod: getenv("ALIPAY_AI_COLLECT_FULFILLMENT_METHOD", legacyMethod),
+		AICollectFulfillmentMethod: getenv("ALIPAY_AI_COLLECT_FULFILLMENT_METHOD", "alipay.aipay.agent.fulfillment.confirm"),
 		AICollectVersion:           getenv("ALIPAY_AI_COLLECT_VERSION", "1.0"),
 		AppAuthToken:               os.Getenv("ALIPAY_APP_AUTH_TOKEN"),
+		SellerID:                   os.Getenv("ALIPAY_SELLER_ID"),
+		SellerName:                 os.Getenv("ALIPAY_SELLER_NAME"),
+		SellerAppID:                getenv("ALIPAY_SELLER_APP_ID", os.Getenv("ALIPAY_APP_ID")),
+		SellerUniqueIDKey:          getenv("ALIPAY_SELLER_UNIQUE_ID_KEY", "seller_id"),
+		ServiceID:                  os.Getenv("ALIPAY_SERVICE_ID"),
+		DefaultGoodsName:           getenv("ALIPAY_DEFAULT_GOODS_NAME", "Paid Resource"),
+		DefaultAmount:              getenv("ALIPAY_DEFAULT_AMOUNT", "0.01"),
+		DefaultCurrency:            getenv("ALIPAY_DEFAULT_CURRENCY", "CNY"),
+		PaymentNetwork:             getenv("ALIPAY_PAYMENT_NETWORK", "alipay-a2a-prod"),
+		PaymentProofTTLMinutes:     getenv("ALIPAY_PAYMENT_PROOF_TTL_MINUTES", "15"),
+		PaymentVerifyMethod:        getenv("ALIPAY_PAYMENT_VERIFY_METHOD", "alipay.aipay.agent.payment.verify"),
 	}
 
 	var err error
@@ -54,11 +77,11 @@ func Load() (Config, error) {
 	if cfg.AlipayPublicKey == "" {
 		return cfg, errors.New("ALIPAY_PUBLIC_KEY or ALIPAY_PUBLIC_KEY_FILE is required")
 	}
-	if cfg.AICollectCredentialMethod == "" {
-		return cfg, errors.New("ALIPAY_AI_COLLECT_CREDENTIAL_METHOD is required for AI Collect credential query")
-	}
 	if cfg.AICollectFulfillmentMethod == "" {
 		return cfg, errors.New("ALIPAY_AI_COLLECT_FULFILLMENT_METHOD is required for AI Collect fulfillment confirmation")
+	}
+	if cfg.PaymentVerifyMethod == "" {
+		return cfg, errors.New("ALIPAY_PAYMENT_VERIFY_METHOD is required for Payment-Proof verification")
 	}
 	return cfg, nil
 }
