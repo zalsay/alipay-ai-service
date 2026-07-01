@@ -4,6 +4,9 @@
 
 Golang backend service for Alipay AI 收 / A2A Agent paid-resource scenarios.
 
+Official Alipay AI 收 product page:
+https://b.alipay.com/page/product-workspace/product-detail/I1080300001000160457/newProductList?
+
 This project implements the documented flow:
 
 1. Agent requests a paid resource.

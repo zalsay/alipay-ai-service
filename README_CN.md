@@ -4,6 +4,9 @@
 
 这是一个面向支付宝 AI 收 / A2A Agent 付费资源场景的 Go 后端服务。
 
+支付宝 AI 收官方产品页：
+https://b.alipay.com/page/product-workspace/product-detail/I1080300001000160457/newProductList?
+
 ## 功能概览
 
 - 支持 `402 Payment Required` 和 `Payment-Needed` 响应头。
