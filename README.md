@@ -1,5 +1,7 @@
 # Alipay AI Collect Service (Agent / AI 收网关)
 
+[中文](README_CN.md)
+
 Golang backend service for Alipay AI 收 / A2A Agent paid-resource scenarios.
 
 This project implements the documented flow:
