@@ -8,21 +8,45 @@ This project implements the documented flow:
 2. Seller server checks the `Payment-Proof` request header.
 3. If no valid proof exists, seller server returns `402 Payment Required` with a `Payment-Needed` header.
 4. Agent/user completes payment with Alipay.
-5. Agent retries the resource request with `Payment-Proof`.
-6. Seller server calls `alipay.aipay.agent.payment.verify`.
-7. If `active=true`, seller server returns the resource and asynchronously calls `alipay.aipay.agent.fulfillment.confirm`.
+5. Agent retries the resource request with `Payment-Proof`, or calls `/v1/paid-resource/check` when the buyer payment tool only returns payment status / trade number.
+6. Seller server verifies `Payment-Proof` through `alipay.aipay.agent.payment.verify`, or checks trade status through `alipay.trade.query`.
+7. If payment is active, `TRADE_SUCCESS`, or `TRADE_FINISHED`, seller server persists the unlock state and returns the resource.
+8. After resource delivery, seller server asynchronously calls `alipay.aipay.agent.fulfillment.confirm` when the proof-verification path provides a trade number.
 
 ## Features
 
 - Implements `402 Payment Required` + `Payment-Needed` header.
+- Provides `/v1/paid-resource/payment-needed` for clients that need bill JSON instead of a response header.
 - Parses `Payment-Proof` header.
 - Calls `alipay.aipay.agent.payment.verify` to verify paid credentials.
+- Provides `/v1/paid-resource/check` to unlock a paid resource through `alipay.trade.query`.
+- Persists payment bill bindings and resource unlock records through Postgres or a local file backend.
 - Calls `alipay.aipay.agent.fulfillment.confirm` after resource delivery.
 - Builds local `seller_signature` for the Payment-Needed bill using RSA2.
 - Keeps `/v1/ai-collect/call` as a backward-compatible raw OpenAPI proxy.
 - Keeps `/v1/alipay/notify` for compatibility with asynchronous Alipay notifications.
 
 ## Main Endpoint
+
+### Client-Friendly Payment Bill
+
+If a buyer client cannot conveniently read the `Payment-Needed` response header from a
+`402 Payment Required` response, it can request the same bill as JSON:
+
+```bash
+curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/payment-needed \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_id": "RES_001",
+    "out_trade_no": "ORDER_001",
+    "goods_name": "Agent API Call",
+    "amount": "0.01",
+    "currency": "CNY"
+  }'
+```
+
+The response includes `payment_needed`, which is the value the buyer Agent should
+treat exactly like the `Payment-Needed` header, and `bill`, the decoded JSON.
 
 ### Paid Resource Access
 
@@ -115,6 +139,41 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare 
 
 If `alipay.aipay.agent.payment.verify` returns `active=true`, the service returns `200 OK` and sends fulfillment confirmation in the background.
 
+### Payment Status Check And Unlock
+
+If the buyer payment tool confirms payment by `out_trade_no` or `trade_no` but cannot
+return a usable `Payment-Proof`, confirm and unlock the resource with:
+
+```bash
+curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/check \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_id": "RES_001",
+    "out_trade_no": "ORDER_001",
+    "trade_no": "20260701008281113044450000057755"
+  }'
+```
+
+The service calls `alipay.trade.query`. If Alipay returns `TRADE_SUCCESS` or
+`TRADE_FINISHED`, the local resource state is marked unlocked. A later
+`POST /v1/paid-resource/prepare` with the same `resource_id` and `out_trade_no`
+returns `200 OK` even without `Payment-Proof`.
+
+Payment bills and unlock records are persisted through `PAYMENT_STATE_BACKEND`.
+For Docker Compose, pass a Postgres DSN through your local `.env` file. Do not
+commit real database credentials:
+
+```text
+PAYMENT_STATE_BACKEND=postgres
+PAYMENT_STATE_DB_DSN=<your private postgres DSN>
+```
+
+The file backend remains available with `PAYMENT_STATE_BACKEND=file` and
+`PAYMENT_STATE_DB_PATH=/data/payment-state.json`.
+
+The local `.env`, `secrets/`, and local state database files are ignored by git.
+Use `.env.example` as the non-secret template.
+
 ## Nginx `/alipay` Prefix
 
 The Go service listens on `/v1/...`. To expose public URLs under `/alipay/v1/...`, run:
@@ -190,11 +249,17 @@ POST /alipay/v1/alipay/notify
 | --- | --- |
 | `SERVER_ADDR` | HTTP listen address, default `:8080` |
 | `ALIPAY_GATEWAY` | Alipay OpenAPI Gateway, default `https://openapi.alipay.com/gateway.do` |
-| `ALIPAY_APP_ID` | Open Platform AppID |
+| `ALIPAY_APP_ID` | Optional Open Platform AppID |
 | `ALIPAY_APP_PRIVATE_KEY` / `ALIPAY_APP_PRIVATE_KEY_FILE` | Application private key PEM |
 | `ALIPAY_PUBLIC_KEY` / `ALIPAY_PUBLIC_KEY_FILE` | Alipay public key PEM |
+| `ALIPAY_AI_COLLECT_METHOD` | Optional legacy generic method used by `/v1/ai-collect/call` |
+| `ALIPAY_AI_COLLECT_CREDENTIAL_METHOD` | Optional credential query method; defaults to `ALIPAY_AI_COLLECT_METHOD` |
 | `ALIPAY_PAYMENT_VERIFY_METHOD` | Default `alipay.aipay.agent.payment.verify` |
 | `ALIPAY_AI_COLLECT_FULFILLMENT_METHOD` | Default `alipay.aipay.agent.fulfillment.confirm` |
+| `ALIPAY_PAYMENT_STATUS_QUERY_METHOD` | Default `alipay.trade.query`; used by `/v1/paid-resource/check` |
+| `PAYMENT_STATE_BACKEND` | Payment state backend: `postgres` or `file`; Docker default `postgres` |
+| `PAYMENT_STATE_DB_DSN` | Postgres DSN when `PAYMENT_STATE_BACKEND=postgres` |
+| `PAYMENT_STATE_DB_PATH` | File backend state path, default `/data/payment-state.json` |
 | `ALIPAY_SELLER_ID` | Seller userId / 2088 ID |
 | `ALIPAY_SELLER_NAME` | Seller display name |
 | `ALIPAY_SELLER_APP_ID` | Seller app id; defaults to `ALIPAY_APP_ID` |

@@ -24,7 +24,7 @@ func SignRSA2(params map[string]string, privateKey string) (string, error) {
 		return "", err
 	}
 
-	hashed := sha256.Sum256([]byte(CanonicalString(params, nil)))
+	hashed := sha256.Sum256([]byte(CanonicalString(params, map[string]bool{"sign": true, "sign_type": true})))
 	sig, err := rsa.SignPKCS1v15(rand.Reader, priv, crypto.SHA256, hashed[:])
 	if err != nil {
 		return "", err
@@ -84,15 +84,25 @@ func CanonicalString(params map[string]string, excludes map[string]bool) string 
 
 func parseRSAPrivateKey(privateKey string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(privateKey)))
-	if block == nil || !strings.Contains(block.Type, "PRIVATE KEY") {
-		return nil, errors.New("invalid private key PEM")
+	der := []byte(nil)
+	if block != nil {
+		if !strings.Contains(block.Type, "PRIVATE KEY") {
+			return nil, errors.New("invalid private key PEM")
+		}
+		der = block.Bytes
+	} else {
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(privateKey))
+		if err != nil {
+			return nil, errors.New("invalid private key PEM or base64 DER")
+		}
+		der = decoded
 	}
 
-	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {
 		return key, nil
 	}
 
-	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	parsed, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
 		return nil, fmt.Errorf("parse private key: %w", err)
 	}
@@ -105,11 +115,21 @@ func parseRSAPrivateKey(privateKey string) (*rsa.PrivateKey, error) {
 
 func parseRSAPublicKey(publicKey string) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(publicKey)))
-	if block == nil || !strings.Contains(block.Type, "PUBLIC KEY") {
-		return nil, errors.New("invalid public key PEM")
+	der := []byte(nil)
+	if block != nil {
+		if !strings.Contains(block.Type, "PUBLIC KEY") {
+			return nil, errors.New("invalid public key PEM")
+		}
+		der = block.Bytes
+	} else {
+		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(publicKey))
+		if err != nil {
+			return nil, errors.New("invalid public key PEM or base64 DER")
+		}
+		der = decoded
 	}
 
-	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	parsed, err := x509.ParsePKIXPublicKey(der)
 	if err == nil {
 		key, ok := parsed.(*rsa.PublicKey)
 		if !ok {
@@ -118,7 +138,7 @@ func parseRSAPublicKey(publicKey string) (*rsa.PublicKey, error) {
 		return key, nil
 	}
 
-	key, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	key, err := x509.ParsePKCS1PublicKey(der)
 	if err != nil {
 		return nil, fmt.Errorf("parse public key: %w", err)
 	}

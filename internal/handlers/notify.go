@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/zalsay/alipay-ai-service/internal/config"
+	"github.com/zalsay/alipay-ai-service/internal/payment"
 	"github.com/zalsay/alipay-ai-service/internal/utils"
 )
 
@@ -40,8 +41,29 @@ func HandleNotify(w http.ResponseWriter, r *http.Request) {
 	tradeStatus := params["trade_status"]
 	log.Printf("alipay notify verified: trade_no=%s out_trade_no=%s trade_status=%s", tradeNo, outTradeNo, tradeStatus)
 
-	// TODO: persist notification and update local order state idempotently.
-	// Recommended key: out_trade_no + trade_no + trade_status.
+	if payment.IsPaidStatus(tradeStatus) {
+		resourceID, ok, err := payment.BillResourceID(outTradeNo)
+		if err != nil {
+			log.Printf("lookup payment bill binding failed: trade_no=%s out_trade_no=%s err=%v", tradeNo, outTradeNo, err)
+			writeAlipayNotifyResult(w, "fail", http.StatusInternalServerError)
+			return
+		}
+		if ok {
+			if _, err := payment.MarkUnlocked(payment.UnlockRecord{
+				ResourceID:  resourceID,
+				OutTradeNo:  outTradeNo,
+				TradeNo:     tradeNo,
+				TradeStatus: tradeStatus,
+			}); err != nil {
+				log.Printf("persist payment unlock failed: trade_no=%s out_trade_no=%s err=%v", tradeNo, outTradeNo, err)
+				writeAlipayNotifyResult(w, "fail", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			log.Printf("alipay notify paid but no local bill binding found: trade_no=%s out_trade_no=%s", tradeNo, outTradeNo)
+		}
+	}
+
 	writeAlipayNotifyResult(w, "success", http.StatusOK)
 }
 

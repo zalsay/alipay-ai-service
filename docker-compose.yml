@@ -1,19 +1,50 @@
 version: '3.9'
 services:
   alipay-ai-service:
+    build: .
     image: alipay-ai-service-runtime:latest
     container_name: alipay-ai-service
     ports:
       - "8080:8080"
     environment:
-      - SERVER_ADDR=:8080
-      - ALIPAY_GATEWAY=https://openapi.alipay.com/gateway.do
+      - SERVER_ADDR=${SERVER_ADDR:-:8080}
+      - ALIPAY_GATEWAY=${ALIPAY_GATEWAY:-https://openapi.alipay.com/gateway.do}
       - ALIPAY_APP_ID=${ALIPAY_APP_ID}
-      - ALIPAY_APP_PRIVATE_KEY_FILE=/run/secrets/app_private_key.pem
-      - ALIPAY_PUBLIC_KEY_FILE=/run/secrets/alipay_public_key.pem
+      - ALIPAY_APP_PRIVATE_KEY=${ALIPAY_APP_PRIVATE_KEY}
+      - ALIPAY_APP_PRIVATE_KEY_FILE=${ALIPAY_APP_PRIVATE_KEY_FILE:-/run/secrets/app_private_key.pem}
+      - ALIPAY_PUBLIC_KEY=${ALIPAY_PUBLIC_KEY}
+      - ALIPAY_PUBLIC_KEY_FILE=${ALIPAY_PUBLIC_KEY_FILE:-/run/secrets/alipay_public_key.pem}
       - ALIPAY_NOTIFY_URL=${ALIPAY_NOTIFY_URL}
       - ALIPAY_AI_COLLECT_METHOD=${ALIPAY_AI_COLLECT_METHOD}
-      - ALIPAY_AI_COLLECT_VERSION=1.0
+      - ALIPAY_AI_COLLECT_CREDENTIAL_METHOD=${ALIPAY_AI_COLLECT_CREDENTIAL_METHOD}
+      - ALIPAY_PAYMENT_VERIFY_METHOD=${ALIPAY_PAYMENT_VERIFY_METHOD:-alipay.aipay.agent.payment.verify}
+      - ALIPAY_AI_COLLECT_FULFILLMENT_METHOD=${ALIPAY_AI_COLLECT_FULFILLMENT_METHOD:-alipay.aipay.agent.fulfillment.confirm}
+      - ALIPAY_PAYMENT_STATUS_QUERY_METHOD=${ALIPAY_PAYMENT_STATUS_QUERY_METHOD:-alipay.trade.query}
+      - PAYMENT_STATE_BACKEND=${PAYMENT_STATE_BACKEND:-postgres}
+      - PAYMENT_STATE_DB_PATH=${PAYMENT_STATE_DB_PATH:-/data/payment-state.json}
+      - PAYMENT_STATE_DB_DSN=${PAYMENT_STATE_DB_DSN}
+      - ALIPAY_AI_COLLECT_VERSION=${ALIPAY_AI_COLLECT_VERSION:-1.0}
       - ALIPAY_APP_AUTH_TOKEN=${ALIPAY_APP_AUTH_TOKEN}
+      - ALIPAY_SELLER_ID=${ALIPAY_SELLER_ID}
+      - ALIPAY_SELLER_NAME=${ALIPAY_SELLER_NAME}
+      - ALIPAY_SELLER_APP_ID=${ALIPAY_SELLER_APP_ID}
+      - ALIPAY_SELLER_UNIQUE_ID_KEY=${ALIPAY_SELLER_UNIQUE_ID_KEY:-seller_id}
+      - ALIPAY_SERVICE_ID=${ALIPAY_SERVICE_ID}
+      - ALIPAY_DEFAULT_GOODS_NAME=${ALIPAY_DEFAULT_GOODS_NAME:-Paid Resource}
+      - ALIPAY_DEFAULT_AMOUNT=${ALIPAY_DEFAULT_AMOUNT:-0.01}
+      - ALIPAY_DEFAULT_CURRENCY=${ALIPAY_DEFAULT_CURRENCY:-CNY}
+      - ALIPAY_PAYMENT_NETWORK=${ALIPAY_PAYMENT_NETWORK:-alipay-a2a-prod}
+      - ALIPAY_PAYMENT_PROOF_TTL_MINUTES=${ALIPAY_PAYMENT_PROOF_TTL_MINUTES:-15}
     volumes:
       - ./secrets:/run/secrets:ro
+      - payment-data:/data
+    networks:
+      - default
+      - 1panel-network
+
+networks:
+  1panel-network:
+    external: true
+
+volumes:
+  payment-data:

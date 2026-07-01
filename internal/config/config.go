@@ -20,17 +20,21 @@ type Config struct {
 	AICollectVersion           string
 	AppAuthToken               string
 
-	SellerID                string
-	SellerName              string
-	SellerAppID             string
-	SellerUniqueIDKey       string
-	ServiceID               string
-	DefaultGoodsName        string
-	DefaultAmount           string
-	DefaultCurrency         string
-	PaymentNetwork          string
-	PaymentProofTTLMinutes  string
-	PaymentVerifyMethod     string
+	SellerID                 string
+	SellerName               string
+	SellerAppID              string
+	SellerUniqueIDKey        string
+	ServiceID                string
+	DefaultGoodsName         string
+	DefaultAmount            string
+	DefaultCurrency          string
+	PaymentNetwork           string
+	PaymentProofTTLMinutes   string
+	PaymentVerifyMethod      string
+	PaymentStatusQueryMethod string
+	PaymentStateBackend      string
+	PaymentStateDBPath       string
+	PaymentStateDBDSN        string
 }
 
 func Load() (Config, error) {
@@ -56,6 +60,10 @@ func Load() (Config, error) {
 		PaymentNetwork:             getenv("ALIPAY_PAYMENT_NETWORK", "alipay-a2a-prod"),
 		PaymentProofTTLMinutes:     getenv("ALIPAY_PAYMENT_PROOF_TTL_MINUTES", "15"),
 		PaymentVerifyMethod:        getenv("ALIPAY_PAYMENT_VERIFY_METHOD", "alipay.aipay.agent.payment.verify"),
+		PaymentStatusQueryMethod:   getenv("ALIPAY_PAYMENT_STATUS_QUERY_METHOD", "alipay.trade.query"),
+		PaymentStateBackend:        getenv("PAYMENT_STATE_BACKEND", "file"),
+		PaymentStateDBPath:         getenv("PAYMENT_STATE_DB_PATH", "/data/payment-state.json"),
+		PaymentStateDBDSN:          os.Getenv("PAYMENT_STATE_DB_DSN"),
 	}
 
 	var err error
@@ -68,9 +76,6 @@ func Load() (Config, error) {
 		return cfg, fmt.Errorf("load alipay public key: %w", err)
 	}
 
-	if cfg.AppID == "" {
-		return cfg, errors.New("ALIPAY_APP_ID is required")
-	}
 	if cfg.AppPrivateKey == "" {
 		return cfg, errors.New("ALIPAY_APP_PRIVATE_KEY or ALIPAY_APP_PRIVATE_KEY_FILE is required")
 	}
@@ -82,6 +87,21 @@ func Load() (Config, error) {
 	}
 	if cfg.PaymentVerifyMethod == "" {
 		return cfg, errors.New("ALIPAY_PAYMENT_VERIFY_METHOD is required for Payment-Proof verification")
+	}
+	if cfg.PaymentStatusQueryMethod == "" {
+		return cfg, errors.New("ALIPAY_PAYMENT_STATUS_QUERY_METHOD is required for paid-resource payment status checks")
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.PaymentStateBackend)) {
+	case "", "file":
+		if cfg.PaymentStateDBPath == "" {
+			return cfg, errors.New("PAYMENT_STATE_DB_PATH is required")
+		}
+	case "postgres", "postgresql":
+		if cfg.PaymentStateDBDSN == "" {
+			return cfg, errors.New("PAYMENT_STATE_DB_DSN is required when PAYMENT_STATE_BACKEND=postgres")
+		}
+	default:
+		return cfg, fmt.Errorf("unsupported PAYMENT_STATE_BACKEND %q", cfg.PaymentStateBackend)
 	}
 	return cfg, nil
 }
