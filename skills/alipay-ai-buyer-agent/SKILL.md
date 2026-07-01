@@ -54,6 +54,7 @@ Current default bill parameters:
 
 1. Execute the business flow up to order confirmation: identify the resource, amount, goods title, and buyer intent.
 2. Generate a unique `out_trade_no` for the attempted purchase. Reuse the same value when retrying with `Payment-Proof`.
+   - The buyer client must send `service_id`, `goods_name`, and `amount`; the seller service no longer fills these from environment defaults.
 3. If the runtime has the official `alipay-payment-skill`, initiate AI pay through the standard 402 protocol:
    - Call `POST /v1/paid-resource/prepare` without `Payment-Proof`.
    - Preserve the original request URL, method, body, and headers.
@@ -106,6 +107,7 @@ curl -k -i -X POST 'https://go-api.meetlife.com.cn/alipay/v1/paid-resource/prepa
   -d '{
     "resource_id": "MTF_SINGLE_STOCK_001",
     "out_trade_no": "ORDER_CLIENT_001",
+    "service_id": "API_49744029FAB14B42",
     "goods_name": "mtf 单股",
     "amount": "0.99",
     "currency": "CNY"
@@ -129,6 +131,7 @@ curl -k -sS -X POST 'https://go-api.meetlife.com.cn/alipay/v1/paid-resource/paym
   -d '{
     "resource_id": "MTF_SINGLE_STOCK_001",
     "out_trade_no": "ORDER_CLIENT_001",
+    "service_id": "API_49744029FAB14B42",
     "goods_name": "mtf 单股",
     "amount": "0.99",
     "currency": "CNY"
@@ -185,6 +188,7 @@ curl -k -i -X POST 'https://go-api.meetlife.com.cn/alipay/v1/paid-resource/prepa
   -d '{
     "resource_id": "MTF_SINGLE_STOCK_001",
     "out_trade_no": "ORDER_CLIENT_001",
+    "service_id": "API_49744029FAB14B42",
     "goods_name": "mtf 单股",
     "amount": "0.99",
     "currency": "CNY"

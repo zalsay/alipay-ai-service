@@ -12,6 +12,7 @@ import (
 type BillInput struct {
 	OutTradeNo string
 	ResourceID string
+	ServiceID  string
 	GoodsName  string
 	Amount     string
 	Currency   string
@@ -30,22 +31,22 @@ func BuildPaymentNeeded(cfg config.Config, in BillInput) (PaymentNeeded, string,
 	if cfg.SellerName == "" {
 		return PaymentNeeded{}, "", fmt.Errorf("ALIPAY_SELLER_NAME is required")
 	}
-	if cfg.ServiceID == "" {
-		return PaymentNeeded{}, "", fmt.Errorf("ALIPAY_SERVICE_ID is required")
+	if in.ServiceID == "" {
+		return PaymentNeeded{}, "", fmt.Errorf("service_id is required")
+	}
+	if in.GoodsName == "" {
+		return PaymentNeeded{}, "", fmt.Errorf("goods_name is required")
+	}
+	if in.Amount == "" {
+		return PaymentNeeded{}, "", fmt.Errorf("amount is required")
 	}
 
 	amount := in.Amount
-	if amount == "" {
-		amount = cfg.DefaultAmount
-	}
 	currency := in.Currency
 	if currency == "" {
 		currency = cfg.DefaultCurrency
 	}
 	goodsName := in.GoodsName
-	if goodsName == "" {
-		goodsName = cfg.DefaultGoodsName
-	}
 
 	ttlMinutes, err := strconv.Atoi(cfg.PaymentProofTTLMinutes)
 	if err != nil || ttlMinutes <= 0 {
@@ -61,7 +62,7 @@ func BuildPaymentNeeded(cfg config.Config, in BillInput) (PaymentNeeded, string,
 		"pay_before":   payBefore,
 		"resource_id":  in.ResourceID,
 		"seller_id":    cfg.SellerID,
-		"service_id":   cfg.ServiceID,
+		"service_id":   in.ServiceID,
 	}
 	sellerSignature, err := utils.SignRSA2(signParams, cfg.AppPrivateKey)
 	if err != nil {
@@ -86,7 +87,7 @@ func BuildPaymentNeeded(cfg config.Config, in BillInput) (PaymentNeeded, string,
 			SellerAppID:       cfg.SellerAppID,
 			GoodsName:         goodsName,
 			SellerUniqueIDKey: cfg.SellerUniqueIDKey,
-			ServiceID:         cfg.ServiceID,
+			ServiceID:         in.ServiceID,
 		},
 	}
 

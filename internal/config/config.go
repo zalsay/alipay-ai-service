@@ -24,9 +24,6 @@ type Config struct {
 	SellerName               string
 	SellerAppID              string
 	SellerUniqueIDKey        string
-	ServiceID                string
-	DefaultGoodsName         string
-	DefaultAmount            string
 	DefaultCurrency          string
 	PaymentNetwork           string
 	PaymentProofTTLMinutes   string
@@ -53,9 +50,6 @@ func Load() (Config, error) {
 		SellerName:                 os.Getenv("ALIPAY_SELLER_NAME"),
 		SellerAppID:                getenv("ALIPAY_SELLER_APP_ID", os.Getenv("ALIPAY_APP_ID")),
 		SellerUniqueIDKey:          getenv("ALIPAY_SELLER_UNIQUE_ID_KEY", "seller_id"),
-		ServiceID:                  os.Getenv("ALIPAY_SERVICE_ID"),
-		DefaultGoodsName:           getenv("ALIPAY_DEFAULT_GOODS_NAME", "Paid Resource"),
-		DefaultAmount:              getenv("ALIPAY_DEFAULT_AMOUNT", "0.01"),
 		DefaultCurrency:            getenv("ALIPAY_DEFAULT_CURRENCY", "CNY"),
 		PaymentNetwork:             getenv("ALIPAY_PAYMENT_NETWORK", "alipay-a2a-prod"),
 		PaymentProofTTLMinutes:     getenv("ALIPAY_PAYMENT_PROOF_TTL_MINUTES", "15"),

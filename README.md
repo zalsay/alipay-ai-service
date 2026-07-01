@@ -44,6 +44,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/payment-
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -52,6 +53,8 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/payment-
 
 The response includes `payment_needed`, which is the value the buyer Agent should
 treat exactly like the `Payment-Needed` header, and `bill`, the decoded JSON.
+The client must provide `service_id`, `goods_name`, and `amount` in the request;
+the service does not read those values from environment variables.
 
 ### Paid Resource Access
 
@@ -63,6 +66,7 @@ curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -77,6 +81,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare 
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -136,6 +141,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare 
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -200,7 +206,7 @@ Test after installation:
 curl -i http://your-domain.example.com/alipay/healthz
 curl -i -X POST http://your-domain.example.com/alipay/v1/paid-resource/prepare \
   -H 'Content-Type: application/json' \
-  -d '{"resource_id":"RES_001","out_trade_no":"ORDER_001","goods_name":"Agent API Call","amount":"0.01","currency":"CNY"}'
+  -d '{"resource_id":"RES_001","out_trade_no":"ORDER_001","service_id":"SERVICE_001","goods_name":"Agent API Call","amount":"0.01","currency":"CNY"}'
 ```
 
 For HTTPS, install a certificate with your preferred tool, such as certbot, and keep the same `/alipay/` location rules.
@@ -269,9 +275,6 @@ POST /alipay/v1/alipay/notify
 | `ALIPAY_SELLER_NAME` | Seller display name |
 | `ALIPAY_SELLER_APP_ID` | Seller app id; defaults to `ALIPAY_APP_ID` |
 | `ALIPAY_SELLER_UNIQUE_ID_KEY` | Default `seller_id` |
-| `ALIPAY_SERVICE_ID` | Service ID from Alipay AI 收 documentation |
-| `ALIPAY_DEFAULT_GOODS_NAME` | Default goods title |
-| `ALIPAY_DEFAULT_AMOUNT` | Default amount, e.g. `0.01` |
 | `ALIPAY_DEFAULT_CURRENCY` | Default `CNY` |
 | `ALIPAY_PAYMENT_NETWORK` | Default `alipay-a2a-prod` |
 | `ALIPAY_PAYMENT_PROOF_TTL_MINUTES` | Payment bill expiration minutes, default `15` |

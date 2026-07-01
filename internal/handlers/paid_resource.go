@@ -17,6 +17,7 @@ type paidResourceRequest struct {
 	ResourceID string `json:"resource_id"`
 	OutTradeNo string `json:"out_trade_no"`
 	TradeNo    string `json:"trade_no,omitempty"`
+	ServiceID  string `json:"service_id,omitempty"`
 	GoodsName  string `json:"goods_name,omitempty"`
 	Subject    string `json:"subject,omitempty"`
 	Amount     string `json:"amount,omitempty"`
@@ -224,6 +225,7 @@ func readPaidResourceRequest(r *http.Request) (paidResourceRequest, error) {
 		ResourceID: r.URL.Query().Get("resource_id"),
 		OutTradeNo: r.URL.Query().Get("out_trade_no"),
 		TradeNo:    r.URL.Query().Get("trade_no"),
+		ServiceID:  r.URL.Query().Get("service_id"),
 		GoodsName:  r.URL.Query().Get("goods_name"),
 		Subject:    r.URL.Query().Get("subject"),
 		Amount:     r.URL.Query().Get("amount"),
@@ -265,6 +267,7 @@ func buildPaymentNeeded(cfg config.Config, req paidResourceRequest) (paymentNeed
 	bill, encoded, err := a2a.BuildPaymentNeeded(cfg, a2a.BillInput{
 		OutTradeNo: req.OutTradeNo,
 		ResourceID: req.ResourceID,
+		ServiceID:  req.ServiceID,
 		GoodsName:  goodsName,
 		Amount:     req.Amount,
 		Currency:   req.Currency,

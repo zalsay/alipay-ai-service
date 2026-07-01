@@ -40,6 +40,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/payment-
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -47,6 +48,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/payment-
 ```
 
 响应中的 `payment_needed` 等价于标准 402 流程里的 `Payment-Needed` 响应头。
+客户端必须在请求中传入 `service_id`、`goods_name` 和 `amount`；服务端不再从环境变量读取这三个值。
 
 ### 请求付费资源
 
@@ -58,6 +60,7 @@ curl -i -X POST http://localhost:8080/v1/paid-resource/prepare \
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -72,6 +75,7 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare 
   -d '{
     "resource_id": "RES_001",
     "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
     "goods_name": "Agent API Call",
     "amount": "0.01",
     "currency": "CNY"
@@ -104,7 +108,11 @@ curl -i -X POST https://your-domain.example.com/alipay/v1/paid-resource/prepare 
   -H 'Payment-Proof: <base64 encoded proof from buyer agent>' \
   -d '{
     "resource_id": "RES_001",
-    "out_trade_no": "ORDER_001"
+    "out_trade_no": "ORDER_001",
+    "service_id": "SERVICE_001",
+    "goods_name": "Agent API Call",
+    "amount": "0.01",
+    "currency": "CNY"
   }'
 ```
 
@@ -212,9 +220,6 @@ POST /alipay/v1/alipay/notify
 | `ALIPAY_SELLER_NAME` | 卖家展示名称 |
 | `ALIPAY_SELLER_APP_ID` | 卖家应用 AppID，未设置时默认使用 `ALIPAY_APP_ID` |
 | `ALIPAY_SELLER_UNIQUE_ID_KEY` | Payment-Needed 中卖家唯一标识字段名 |
-| `ALIPAY_SERVICE_ID` | 支付宝 AI 收服务 ID |
-| `ALIPAY_DEFAULT_GOODS_NAME` | 默认商品名称 |
-| `ALIPAY_DEFAULT_AMOUNT` | 默认支付金额 |
 | `ALIPAY_DEFAULT_CURRENCY` | 默认币种 |
 | `ALIPAY_PAYMENT_NETWORK` | Payment-Needed 中的支付网络标识 |
 | `ALIPAY_PAYMENT_PROOF_TTL_MINUTES` | 支付账单有效期，单位分钟 |
